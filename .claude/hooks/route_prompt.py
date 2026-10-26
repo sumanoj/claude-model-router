@@ -91,6 +91,10 @@ def classify(prompt):
     return "standard", f"deep={deep} fast={fast} len={length}"
 
 
+# Messages that start with these are delivered by Claude Code, not typed by
+# the user, and are never classified.
+NON_USER_PREFIXES = ("<task-notification>", "<agent-message")
+
 AGENT_FOR_TIER = {
     "fast": "router-fast",
     "standard": "router-standard",
@@ -146,10 +150,10 @@ def main():
     prompt = payload.get("prompt") or ""
     if not prompt.strip():
         return 0
-    # Background subagent results come back through this hook as
-    # <task-notification> messages. They are not user prompts: classifying
-    # them would show a false tier and reset the status line.
-    if prompt.lstrip().startswith("<task-notification>"):
+    # Subagent results come back through this hook as <task-notification> or
+    # <agent-message> messages. They are not user prompts: classifying them
+    # would show a false tier and reset the status line.
+    if prompt.lstrip().startswith(NON_USER_PREFIXES):
         return 0
 
     session_id = payload.get("session_id") or ""
