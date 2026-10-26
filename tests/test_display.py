@@ -66,6 +66,14 @@ class DisplayTests(unittest.TestCase):
         self.prompt("fix the typo in README", session="a")
         self.assertIn("no prompt classified yet", self.status(session="b"))
 
+    def test_task_notification_is_not_classified(self):
+        self.prompt("fix the typo in README")
+        self.delegate("router-fast")
+        note = "<task-notification>\n<task-id>abc</task-id>\n" + "result text " * 100
+        out = self.run_script(ROUTE, {"prompt": note, "session_id": "s1"})
+        self.assertEqual(out, "")
+        self.assertTrue(self.status().endswith("ran: router-fast (ok)"))
+
     def test_other_tools_ignored(self):
         self.assertEqual(self.run_script(TRACK, {"tool_name": "Bash", "session_id": "s1"}), "")
 

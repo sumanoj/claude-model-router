@@ -146,6 +146,11 @@ def main():
     prompt = payload.get("prompt") or ""
     if not prompt.strip():
         return 0
+    # Background subagent results come back through this hook as
+    # <task-notification> messages. They are not user prompts: classifying
+    # them would show a false tier and reset the status line.
+    if prompt.lstrip().startswith("<task-notification>"):
+        return 0
 
     session_id = payload.get("session_id") or ""
     tier, reason = classify(prompt)
