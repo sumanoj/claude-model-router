@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 
-HOOK = os.path.join(os.path.dirname(__file__), "..", ".claude", "hooks", "route_prompt.py")
+HOOK = os.path.join(os.path.dirname(__file__), "..", "plugins", "model-router", "scripts", "route_prompt.py")
 sys.path.insert(0, os.path.dirname(HOOK))
 from route_prompt import classify  # noqa: E402
 
@@ -47,7 +47,7 @@ class HookIOTests(unittest.TestCase):
         stdout, logged = self.run_hook(json.dumps({"prompt": "fix the typo"}))
         data = json.loads(stdout)
         self.assertEqual(data["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit")
-        self.assertIn("router-fast", data["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("model-router:router-fast", data["hookSpecificOutput"]["additionalContext"])
         self.assertTrue(logged)
 
     def test_bad_input_is_silent(self):

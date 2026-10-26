@@ -3,9 +3,10 @@
 
 Reads the hook payload from stdin, scores the prompt with simple keyword and
 length heuristics, and returns a routing hint as additionalContext. The main
-agent then delegates the work to the matching subagent (see CLAUDE.md).
+agent then delegates the work to the matching subagent, following the routing
+policy that session_start.py injects (routing_policy.md).
 
-Tiers:
+Tiers (plugin agents are namespaced "model-router:<agent>"):
   fast      -> router-fast     (Haiku 5.5, low effort)
   standard  -> router-standard (Sonnet 5.5, medium effort)
   deep      -> router-deep     (Opus 5.5, high effort)
@@ -96,10 +97,10 @@ def classify(prompt):
 NON_USER_PREFIXES = ("<task-notification>", "<agent-message")
 
 AGENT_FOR_TIER = {
-    "fast": "router-fast",
-    "standard": "router-standard",
-    "deep": "router-deep",
-    "codex": "codex-worker",
+    "fast": "model-router:router-fast",
+    "standard": "model-router:router-standard",
+    "deep": "model-router:router-deep",
+    "codex": "model-router:codex-worker",
 }
 
 
@@ -164,7 +165,7 @@ def main():
     context = (
         f"Model router: this prompt is classified as tier '{tier}' ({reason}). "
         f"The matching subagent is '{AGENT_FOR_TIER[tier]}'. "
-        "Routing policy is in CLAUDE.md under 'Model routing'."
+        "Follow the model router policy from the start of this session."
     )
     print(json.dumps({
         "systemMessage": f"Router: {tier} -> {AGENT_FOR_TIER[tier]} ({MODEL_FOR_TIER[tier]})",

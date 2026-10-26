@@ -1,0 +1,14 @@
+{
+  "name": "claude-model-router",
+  "owner": {
+    "name": "sumanoj"
+  },
+  "description": "Model routing for Claude Code: Haiku, Sonnet, Opus and Codex picked per prompt.",
+  "plugins": [
+    {
+      "name": "model-router",
+      "source": "./plugins/model-router",
+      "description": "Routes each prompt to Haiku, Sonnet, Opus or Codex based on how hard it is, and shows what it did."
+    }
+  ]
+}

@@ -1,28 +1,24 @@
 # Claude Model Router
 
-## Model routing
+This repo is a Claude Code plugin marketplace. The router itself is the `model-router` plugin in `plugins/model-router/`.
 
-A `UserPromptSubmit` hook (`.claude/hooks/route_prompt.py`) classifies every prompt and adds a hint like "Model router: this prompt is classified as tier 'deep'".
+## Layout
 
-Follow the hint and delegate the work to the matching subagent:
+- `.claude-plugin/marketplace.json`: marketplace manifest listing the plugin.
+- `plugins/model-router/`: the plugin.
+  - `agents/`: the four tier subagents. Plugin agents are namespaced, so they are called as `model-router:router-fast` and so on.
+  - `hooks/hooks.json`: registers the hooks below.
+  - `scripts/session_start.py`: injects `routing_policy.md`, copies the status line helpers to `~/.claude/model-router/`, restores the Codex sign-in.
+  - `scripts/route_prompt.py`: classifies each prompt.
+  - `scripts/track_delegation.py`: records which subagent actually ran.
+  - `scripts/statusline.py`, `scripts/router_stats.py`: the status line and report.
+  - `routing_policy.md`: the routing rules every session receives. Edit this, not this file, to change routing behavior.
+- `cloud-setup.sh`: cloud environment setup script.
+- `tests/`: `python3 -m unittest discover tests`.
 
-| Tier | Subagent | Model | Use for |
-|---|---|---|---|
-| fast | `router-fast` | Haiku 5.5, low effort | lookups, typos, renames, formatting, short answers |
-| standard | `router-standard` | Sonnet 5.5, medium effort | features, tests, ordinary bugs, docs |
-| deep | `router-deep` | Opus 5.5, high effort | architecture, refactors, migrations, security, hard bugs, plans |
-| codex | `codex-worker` | OpenAI Codex (ChatGPT plan) | anything mentioning Codex/GPT/OpenAI, second opinions |
+## Working on the plugin
 
-Rules:
-- Pass the subagent the full task and any context it needs. It does not see this conversation.
-- If a subagent replies "Escalate to router-standard" or "Escalate to router-deep", re-run the task on that tier.
-- Override the hint only when it is clearly wrong (for example a short prompt that asks for a full system design). Say which tier you used and why in one line.
-- Trivial conversational replies (thanks, yes/no answers about your last message) need no delegation.
-- After `router-deep` finishes a significant code change, and Codex is signed in, ask `codex-worker` for a read-only review and relay any real issues it finds.
-
-## Connecting Codex
-
-If the user asks to "connect Codex":
-1. Run `codex login --device-auth` in the background, writing output to a file.
-2. Read the file and give the user the sign-in link and one-time code.
-3. When the command finishes, confirm with `codex login status`.
+- Run the tests after any change to `scripts/`.
+- Validate with `claude plugin validate .` and `claude plugin validate plugins/model-router`.
+- Bump `version` in `plugins/model-router/.claude-plugin/plugin.json` for each release, or installed copies will not update.
+- To try local changes without installing: `claude --plugin-dir plugins/model-router`.
