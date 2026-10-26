@@ -8,11 +8,12 @@ import tempfile
 import unittest
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-HOOKS = os.path.join(ROOT, ".claude", "hooks")
+HOOKS = os.path.join(ROOT, "plugins", "model-router", "scripts")
 ROUTE = os.path.join(HOOKS, "route_prompt.py")
 TRACK = os.path.join(HOOKS, "track_delegation.py")
 STATUS = os.path.join(HOOKS, "statusline.py")
-STATS = os.path.join(ROOT, "router_stats.py")
+STATS = os.path.join(HOOKS, "router_stats.py")
+SESSION = os.path.join(HOOKS, "session_start.py")
 
 
 class DisplayTests(unittest.TestCase):
@@ -42,23 +43,23 @@ class DisplayTests(unittest.TestCase):
 
     def test_prompt_shows_system_message(self):
         data = self.prompt("fix the typo in README")
-        self.assertEqual(data["systemMessage"], "Router: fast -> router-fast (Haiku 5.5, low effort)")
+        self.assertEqual(data["systemMessage"], "Router: fast -> model-router:router-fast (Haiku 5.5, low effort)")
 
     def test_status_line_lifecycle(self):
         self.assertEqual(self.status(), "Sonnet 5.5 | router: no prompt classified yet")
         self.prompt("fix the typo in README")
         self.assertEqual(self.status(), "Sonnet 5.5 | router: fast -> router-fast | ran: waiting")
-        self.assertIn("matches hint", self.delegate("router-fast"))
+        self.assertIn("matches hint", self.delegate("model-router:router-fast"))
         self.assertEqual(self.status(), "Sonnet 5.5 | router: fast -> router-fast | ran: router-fast (ok)")
 
     def test_override_is_flagged(self):
         self.prompt("fix the typo in README")
-        self.assertIn("hint was router-fast", self.delegate("router-deep"))
+        self.assertIn("hint was model-router:router-fast", self.delegate("model-router:router-deep"))
         self.assertTrue(self.status().endswith("ran: router-deep (override)"))
 
     def test_new_prompt_resets_ran(self):
         self.prompt("fix the typo in README")
-        self.delegate("router-fast")
+        self.delegate("model-router:router-fast")
         self.prompt("design a RAG pipeline architecture with trade-offs")
         self.assertTrue(self.status().endswith("router: deep -> router-deep | ran: waiting"))
 
@@ -68,25 +69,42 @@ class DisplayTests(unittest.TestCase):
 
     def test_subagent_results_are_not_classified(self):
         self.prompt("fix the typo in README")
-        self.delegate("router-fast")
+        self.delegate("model-router:router-fast")
         for note in ("<task-notification>\n<task-id>abc</task-id>\n" + "result text " * 100,
                      '<agent-message from="a1">\n[Subagent hand-back] ' + "report " * 200):
             out = self.run_script(ROUTE, {"prompt": note, "session_id": "s1"})
             self.assertEqual(out, "")
         self.assertTrue(self.status().endswith("ran: router-fast (ok)"))
 
+    def test_session_start_injects_policy_and_helpers(self):
+        out = json.loads(self.run_script(SESSION, {"session_id": "s1", "source": "startup"}))
+        self.assertIn("model-router:router-deep",
+                      out["hookSpecificOutput"]["additionalContext"])
+        self.assertTrue(out["systemMessage"].startswith("Model router active."))
+        helpers = os.path.join(self.tmp.name, ".claude", "model-router")
+        self.assertTrue(os.path.exists(os.path.join(helpers, "statusline.py")))
+        self.assertTrue(os.path.exists(os.path.join(helpers, "router_stats.py")))
+
+    def test_session_start_restores_codex_auth(self):
+        self.env["CODEX_AUTH_JSON_B64"] = "eyJ0b2tlbiI6ICJ4In0="  # {"token": "x"}
+        self.run_script(SESSION, {"session_id": "s1"})
+        auth = os.path.join(self.tmp.name, ".codex", "auth.json")
+        with open(auth) as f:
+            self.assertEqual(json.load(f), {"token": "x"})
+        self.assertEqual(os.stat(auth).st_mode & 0o777, 0o600)
+
     def test_other_tools_ignored(self):
         self.assertEqual(self.run_script(TRACK, {"tool_name": "Bash", "session_id": "s1"}), "")
 
     def test_stats_report(self):
         self.prompt("fix the typo in README")
-        self.delegate("router-fast")
+        self.delegate("model-router:router-fast")
         self.prompt("design a RAG pipeline architecture with trade-offs")
-        self.delegate("router-standard")
+        self.delegate("model-router:router-standard")
         report = self.run_script(STATS, {})
         self.assertIn("Prompts classified: 2", report)
         self.assertIn("followed hint: 1/2 (50%)", report)
-        self.assertIn("hint was router-deep", report)
+        self.assertIn("hint was model-router:router-deep", report)
 
 
 if __name__ == "__main__":

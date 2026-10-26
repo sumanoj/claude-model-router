@@ -4,6 +4,10 @@
 Example output:
   Opus 5.5 | router: deep -> router-deep | ran: router-deep (ok)
 
+The plugin's SessionStart hook copies this file to
+~/.claude/model-router/statusline.py so settings.json can point at a fixed path.
+Agent names are shown without the "model-router:" prefix to keep it short.
+
 "ran" lists the subagents launched since the last prompt. "(ok)" means the
 last one matches the hint, "(override)" means the main session picked a
 different tier, and "waiting" means nothing has been delegated yet.
@@ -35,13 +39,16 @@ def main():
         print(f"{model} | router: no prompt classified yet")
         return 0
 
+    def short(agent):
+        return (agent or "").replace("model-router:", "")
+
     ran = state.get("ran") or []
     if not ran:
         result = "waiting"
     else:
         verdict = "ok" if ran[-1] == state.get("expected") else "override"
-        result = f"{', '.join(ran)} ({verdict})"
-    print(f"{model} | router: {state.get('tier')} -> {state.get('expected')} | ran: {result}")
+        result = f"{', '.join(short(a) for a in ran)} ({verdict})"
+    print(f"{model} | router: {state.get('tier')} -> {short(state.get('expected'))} | ran: {result}")
     return 0
 
 

@@ -1,0 +1,7 @@
+{
+  "name": "model-router",
+  "version": "1.0.0",
+  "description": "Routes each prompt to Haiku, Sonnet, Opus or Codex based on how hard it is, and shows what it did.",
+  "author": {"name": "sumanoj"},
+  "repository": "https://github.com/sumanoj/claude-model-router"
+}
