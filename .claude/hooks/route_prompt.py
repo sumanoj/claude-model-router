@@ -11,7 +11,9 @@ Tiers:
   deep      -> router-deep     (Opus 5.5, high effort)
   codex     -> codex-worker    (OpenAI Codex via ChatGPT login)
 
-Every decision is appended to ~/.claude/router-log.jsonl for review.
+Every decision is appended to ~/.claude/router-log.jsonl for review, shown to
+the user as a systemMessage, and saved to ~/.claude/router-state/<session>.json
+for the status line (statusline.py).
 """
 import json
 import os
@@ -97,19 +99,43 @@ AGENT_FOR_TIER = {
 }
 
 
-def log_decision(tier, reason, prompt):
+MODEL_FOR_TIER = {
+    "fast": "Haiku 5.5, low effort",
+    "standard": "Sonnet 5.5, medium effort",
+    "deep": "Opus 5.5, high effort",
+    "codex": "OpenAI Codex",
+}
+
+
+def log_decision(tier, reason, prompt, session_id=""):
     path = os.path.expanduser("~/.claude/router-log.jsonl")
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a") as f:
             f.write(json.dumps({
                 "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "event": "classified",
+                "session": session_id,
                 "tier": tier,
                 "reason": reason,
                 "prompt_preview": prompt[:120],
             }) + "\n")
     except OSError:
         pass  # logging must never block a prompt
+
+
+def save_state(session_id, tier):
+    """Record the latest classification for the status line. Clears 'ran'."""
+    if not session_id:
+        return
+    safe_id = re.sub(r"[^\w-]", "_", session_id)
+    path = os.path.expanduser(f"~/.claude/router-state/{safe_id}.json")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump({"tier": tier, "expected": AGENT_FOR_TIER[tier], "ran": []}, f)
+    except OSError:
+        pass
 
 
 def main():
@@ -121,8 +147,10 @@ def main():
     if not prompt.strip():
         return 0
 
+    session_id = payload.get("session_id") or ""
     tier, reason = classify(prompt)
-    log_decision(tier, reason, prompt)
+    log_decision(tier, reason, prompt, session_id)
+    save_state(session_id, tier)
 
     context = (
         f"Model router: this prompt is classified as tier '{tier}' ({reason}). "
@@ -130,6 +158,7 @@ def main():
         "Routing policy is in CLAUDE.md under 'Model routing'."
     )
     print(json.dumps({
+        "systemMessage": f"Router: {tier} -> {AGENT_FOR_TIER[tier]} ({MODEL_FOR_TIER[tier]})",
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": context,

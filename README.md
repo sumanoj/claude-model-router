@@ -25,11 +25,14 @@ Subagents escalate to a higher tier if a task turns out harder than classified. 
 
 | Path | Role |
 |---|---|
-| `.claude/hooks/route_prompt.py` | Classifies each prompt and injects the routing hint |
+| `.claude/hooks/route_prompt.py` | Classifies each prompt, injects the routing hint, shows it to you |
+| `.claude/hooks/track_delegation.py` | Records which subagent actually ran and whether it matched the hint |
+| `.claude/hooks/statusline.py` | Status line showing the latest hint and the agents that ran |
+| `router_stats.py` | Summary report of the routing log |
 | `.claude/agents/*.md` | The four tier subagents (model + effort per tier) |
 | `CLAUDE.md` | Routing policy the main session follows |
 | `.claude/hooks/session_setup.sh` | Cloud sessions only: installs Superpowers, UI UX Pro Max, Composio skills and Codex CLI |
-| `.claude/settings.json` | Registers both hooks |
+| `.claude/settings.json` | Registers the hooks and status line |
 | `tests/` | Classifier tests: `python3 -m unittest discover tests` |
 
 ## Setup
@@ -46,6 +49,21 @@ Cloud containers are wiped between sessions. To skip signing in each time:
 2. Add the output as an environment variable `CODEX_AUTH_JSON_B64` in the cloud environment settings.
 
 The setup hook restores it on each start. This value grants access to your ChatGPT account, so only do this in an environment you alone use, and sign out (`codex logout`) and remove the variable if it leaks.
+
+## Checking that routing works
+
+You get three views:
+
+1. **A message on every prompt** (all surfaces). The hook prints the tier it picked:
+   `Router: deep -> router-deep (Opus 5.5, high effort)`.
+   When a subagent starts, a second line says whether it matches the hint:
+   `Router: delegated to router-deep (matches hint)` or `(hint was router-fast)`.
+2. **Status line** (terminal CLI):
+   `Sonnet 5.5 | router: deep -> router-deep | ran: router-deep (ok)`.
+   `waiting` means nothing has been delegated yet for this prompt, and `override` means the main session picked a different agent.
+3. **Report**: `python3 router_stats.py` shows the tier mix, how often the hint was followed, and recent events.
+
+If you see no `Router:` line at all, the hooks are not loaded. Start the session from this repo's root and approve the project hooks when prompted.
 
 ## Tuning
 
